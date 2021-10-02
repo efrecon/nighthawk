@@ -9,6 +9,7 @@ on:
 jobs:
 
   image:
+    runs-on: ubuntu-latest
     steps:
       -
         name: Checkout
