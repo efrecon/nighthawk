@@ -77,16 +77,11 @@ _post() {
   fi
 }
 
-_login() {
-  # Yes: twice!
-  _web "$1"
-  _web "$1"
-}
 
 reboot() {
   _verbose "Logging in at $1"
-  _login "$1" >/dev/null
-  _verbose "Acquiring session at $1"
+  _web "$1" --header "Referer: ${1%/}/" >/dev/null
+  _verbose "Discovering session at $1"
   dst=$(  _web "${1%/}/ADVANCED_home2.htm" |
             grep -E '<form.*action\s*=' |
             grep -Eo 'action\s*=\s*"[^"]+"' |
