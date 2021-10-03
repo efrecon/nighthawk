@@ -18,6 +18,8 @@ NIGHTHAWK_VERBOSE=${NIGHTHAWK_VERBOSE:-0}
 # preferred)
 NIGHTHAWK_WEBCLI=${NIGHTHAWK_WEBCLI:-}
 
+NIGHTHAWK_SLEEP=${NIGHTHAWK_SLEEP:-0}
+
 NIGHTHAWK_PAGE_START=start.htm
 NIGHTHAWK_PAGE_ADVANCED=ADVANCED_home2.htm
 
@@ -31,7 +33,7 @@ usage() {
   exit "${1:-0}"
 }
 
-while getopts "u:p:f:vh-" opt; do
+while getopts "u:p:f:s:vh-" opt; do
   case "$opt" in
     u) # Username for administration login
       NIGHTHAWK_USERNAME=$OPTARG;;
@@ -39,6 +41,8 @@ while getopts "u:p:f:vh-" opt; do
       NIGHTHAWK_PASSWORD=$OPTARG;;
     f) # File containing password for administrator user
       NIGHTHAWK_PASSWORD=$(cat "$OPTARG");;
+    s) # Number of seconds to sleep before exiting on error
+      NIGHTHAWK_SLEEP=$OPTARG;;
     v) # Turn on verbosity
       NIGHTHAWK_VERBOSE=1;;
     h)
@@ -60,6 +64,10 @@ _verbose() {
 
 _error() {
   printf %s\\n "$1" >&2
+  if [ "$NIGHTHAWK_SLEEP" -gt "0" ]; then
+    _verbose "Waiting $NIGHTHAWK_SLEEP sec(s). before exiting"
+    sleep "$NIGHTHAWK_SLEEP"
+  fi
   exit 1
 }
 
