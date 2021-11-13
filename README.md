@@ -7,8 +7,7 @@ NightHawk routers from NETGEAR (tested on [R6400] and [R7000]).
 
 ### `reboot`
 
-Directly using the script, provided you have `curl` (well-tested) or `wget`
-installed:
+Directly using the script, provided you have `curl` installed:
 
 ```shell
 ./nighthawk.sh -p SeCRet reboot http://192.168.0.1

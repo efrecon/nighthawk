@@ -14,19 +14,21 @@ NIGHTHAWK_PASSWORD=${NIGHTHAWK_PASSWORD:-}
 # Set this to 1 for more verbosity.
 NIGHTHAWK_VERBOSE=${NIGHTHAWK_VERBOSE:-0}
 
-# Binary/path to perform web operations, empty to discover (curl or wget, curl
-# preferred)
+# Binary/path to curl, empty to discover it
 NIGHTHAWK_WEBCLI=${NIGHTHAWK_WEBCLI:-}
 
+# Number of seconds to sleep before exiting on errors. This can be used to avoid
+# ever-restarting Docker containers.
 NIGHTHAWK_SLEEP=${NIGHTHAWK_SLEEP:-0}
 
+# Start page and advanced (frame)
 NIGHTHAWK_PAGE_START=start.htm
 NIGHTHAWK_PAGE_ADVANCED=ADVANCED_home2.htm
 
 usage() {
   # This uses the comments behind the options to show the help. Not extremly
   # correct, but effective and simple.
-  echo "$0 is a binenv wrapper with following options:" && \
+  echo "$0 is a NETGEAR NightHawk automator:" && \
     grep "[[:space:]].)\ #" "$0" |
     sed 's/#//' |
     sed -r 's/([a-z])\)/-\1/'
@@ -76,25 +78,26 @@ _init() {
   if [ -z "$NIGHTHAWK_WEBCLI" ]; then
     if command -v curl >&2 >/dev/null; then
       NIGHTHAWK_WEBCLI=curl
-    elif command -v wget >&2 >/dev/null; then
-      NIGHTHAWK_WEBCLI=wget
     else
-      _error "Can neither find curl, nor wget for Web operations"
+      _error "Cannot find curl for Web operations"
     fi
+  fi
+}
+
+_web_noauth() {
+  _url=$1; shift
+  _verbose "Requesting $_url"
+
+  if printf %s\\n "$NIGHTHAWK_WEBCLI" | grep -q "curl"; then
+    curl -sSL "$@" "$_url"
+  else
+    _error "Cannot understand type of Web CLI client at $NIGHTHAWK_WEBCLI"
   fi
 }
 
 _web() {
   _url=$1; shift
-  _verbose "Requesting $_url"
-
-  if printf %s\\n "$NIGHTHAWK_WEBCLI" | grep -q "curl"; then
-    curl -sSL -u "${NIGHTHAWK_USERNAME}:${NIGHTHAWK_PASSWORD}" "$@" "$_url"
-  elif printf %s\\n "$NIGHTHAWK_WEBCLI" | grep -q "wget"; then
-    wget -q -O - --header "Authorization: Basic $(printf %s:%s\\n "$NIGHTHAWK_USERNAME" "$NIGHTHAWK_PASSWORD" | base64)" "$@" "$_url"
-  else
-    _error "Cannot understand type of Web CLI client at $NIGHTHAWK_WEBCLI"
-  fi
+  _web_noauth "$_url" -u "${NIGHTHAWK_USERNAME}:${NIGHTHAWK_PASSWORD}" "$@"
 }
 
 _post() {
@@ -102,8 +105,6 @@ _post() {
   _verbose "POSTing $_dta to $_url"
   if printf %s\\n "$NIGHTHAWK_WEBCLI" | grep -q "curl"; then
     _web "$_url" -F "$_dta" "$@"
-  elif printf %s\\n "$NIGHTHAWK_WEBCLI" | grep -q "wget"; then
-    _web "$_url" --post-data "$_dta" "$@"
   else
     _error "Cannot understand type of Web CLI client at $NIGHTHAWK_WEBCLI"
   fi
@@ -111,13 +112,21 @@ _post() {
 
 
 reboot() {
+  jar=$(mktemp -t nighthawkXXXXX.jar);   # Cookie Jar for curl
   _verbose "Logging in at $1"
-  _web "${1%/}/${NIGHTHAWK_PAGE_START}" --header "Referer: ${1%/}/" >/dev/null
-  dst=$(  _web "${1%/}/${NIGHTHAWK_PAGE_ADVANCED}" |
+  # Initialise Cookie storage
+  _web_noauth "$1" --cookie-jar "$jar" > /dev/null
+  # Request the start page, now with authentication, this will generate a
+  # session.
+  _web "${1%/}/${NIGHTHAWK_PAGE_START}" --header "Referer: ${1%/}/" --cookie "$jar" > /dev/null
+  # Now request the advanced page, find out the location where to send reboot
+  # requests.
+  dst=$(  _web "${1%/}/${NIGHTHAWK_PAGE_ADVANCED}" --cookie "$jar" |
             grep -E '<form.*action\s*=' |
             grep -Eo 'action\s*=\s*"[^"]+"' |
             sed -E -e 's/^action\s*=\s*"//' -e 's/"$//' )
   if printf %s\\n "$dst" | grep -q "adv"; then
+    # Rebooting form destination found, perform reboot.
     _verbose "Discovered form destination as $dst, rebooting"
     _post "${1%/}/${dst}" \
         "buttonSelect=2" \
@@ -126,6 +135,7 @@ reboot() {
     _web "${1%/}/${NIGHTHAWK_PAGE_ADVANCED}"
     _error "Wrong form, authorised elsewhere?"
   fi
+  rm -f "$jar";   # Remove the cookie jar.
 }
 
 if [ "$#" -lt "1" ]; then
