@@ -12,3 +12,5 @@ jobs:
     steps:
       - name: keepalive
         uses: efrecon/gh-action-keepalive@main
+        with:
+          options: "-v"
