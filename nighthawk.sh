@@ -112,7 +112,7 @@ _post() {
 
 
 reboot() {
-  jar=$(mktemp -t nighthawkXXXXX.jar);   # Cookie Jar for curl
+  jar=$(mktemp -t nighthawkXXXXX);   # Cookie Jar for curl
   _verbose "Logging in at $1"
   # Initialise Cookie storage
   _web_noauth "$1" --cookie-jar "$jar" > /dev/null
